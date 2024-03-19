@@ -1,0 +1,611 @@
+Data E1286.Exam1_FinalDataset;
+Set E1286.AddingVolatility;
+Keep PermNo Deal_Id Announcement_Date Transaction_status Withdrawn_date
+Completion_date strategic_buyer Attitude Tender_offer Auction pct_cash
+pct_stock price_per_share price_per_share_change acq_public GVKEY Fyear
+Assets Sic_Fourdig Sales_growth totaldebt_assets oibdp_assets hhi mktvalue_equity
+transaction_value tobinsq sameindustry_twodig sameindustry_threedig sameindustry_fourdig
+institutional_ownership cash_payment allcash price_Revision Public_Acquirer Completed_deal
+Friendly_deal Price_m42 Percent_Offerpremium CAR_RunUp
+runup_Percent CAR3_Percent CAR5_Percent Resolution_period Volatility
+Volatility_percent Lnat;
+run;
+
+COMPLETE SAS CODE FOR RESULTANT DATASET RESULTS
+Libname E1286 base "C:\Users\bhavy\OneDrive\Desktop\FA-Exam_1\Library_E1286";
+
+/*Deal classification year-wise*/
+
+Data E1286.Deals_Y;
+Set E1286.Deals_Dateset;
+Year= Year(Announcement_date);
+run;
+
+Proc Sql; Create table E1286.Deals_Yearwise as Select Distinct Year, Count(Year) as Number
+	from E1286.Deals_Y
+	Group By Year;
+	quit;
+
+	Proc Sql; Create table E1286.Deals_Yearwise_Public as Select Distinct Year, Count(Year) as Number
+	from E1286.Deals_Y
+Where Acq_Public=1
+Group By Year;
+	quit;
+
+	Proc Sql; Create table E1286.Deals_Yearwise_Private as Select Distinct Year, Count(Year) as Number
+	from E1286.Deals_Y
+Where Acq_Public=0
+Group By Year;
+	quit;
+
+/*Industry classification values*/
+
+Data E1286.Deals_Industrywise;
+Set E1286.Deals_Dateset;
+if sic_fourdig<1000 then ind = 'a';
+    if sic_fourdig>=1000 & sic_fourdig <=1499 then ind = 'b';
+    if sic_fourdig>=1500 & sic_fourdig <=1799 then ind = 'c';
+    if sic_fourdig>=2000 & sic_fourdig <=3999 then ind = 'd';
+    if sic_fourdig>=4000 & sic_fourdig <=4999 then ind = 'e';
+    if sic_fourdig>=5000 & sic_fourdig <=5199 then ind = 'f';
+    if sic_fourdig>=5200 & sic_fourdig <=5999 then ind = 'g';
+    if sic_fourdig>=6000 & sic_fourdig <=6799 then ind = 'h';
+    if sic_fourdig>=7000 & sic_fourdig <=8999 then ind = 'i';
+    if sic_fourdig>=9000 then ind = 'j';
+	run;
+
+	Proc Sql; Create table E1286.Deals_IndustryClass as Select distinct Ind, Count(Ind) as Ind_no
+	from E1286.Deals_Industrywise
+	Group By Ind;
+	quit;
+
+	Proc Sql; Create table E1286.Deals_IC_Public as Select distinct Ind, Count(Ind) as Ind_no
+    from E1286.Deals_Industrywise
+	Where Acq_Public = 1
+    Group By Ind;
+    quit;
+
+	Proc Sql; Create table E1286.Deals_IC_Private as Select distinct Ind, Count(Ind) as Ind_no
+    from E1286.Deals_Industrywise
+	Where Acq_Public = 0
+    Group By Ind;
+    quit;
+
+/*Looking and replacing announcement date values to 
+next working day-we are checking for days falling on weekends and days falling on public holidays*/
+
+Data E1286.HolidayCheck1;;
+Set E1286.Prices_added_AD;
+Type_AD=weekday(Announcement_date);
+run;
+
+Data E1286.Change_Weekends;
+Set E1286.HolidayCheck1;
+If Type_AD=1 then Announcement_date=(Announcement_date+1);
+If Type_AD=7 then Announcement_date=(Announcement_date+2);
+Else Announcement_date=Announcement_date;
+Run;
+
+Data E1286.CheckNewAD;
+Set E1286.Change_Weekends;
+NewAD= Weekday(Announcement_date);
+Run;
+
+/* The below statement should result in 0 observations meaning now we do not have any announcement_dates falling on weekends*/
+
+Proc Print Data=E1286.CheckNewAD;
+Where NewAD=1 OR NewAD=7;
+run;
+/* Checking for Public Holidays*/
+
+Proc SQL; Create table E1286.Check2dates as
+Select distinct deal_id
+from E1286.CheckNewAD
+where Announcement_date=Date
+Group by Deal_id;
+Quit;
+
+/*The above dataset resulted in 1275 rows which means we have 11 deals (1286-1275)
+whose announcement_date is falling on a public holiday*/
+
+/*After comparing the dataset with 1275 deals it was observed that the deal_ids mentioned in below statement were the ones that were announced on public holidays*/
+
+/*we are running the below code to change their announcement date to next working day-value added based next working day of calendar*/
+
+Data E1286.ChangeHolidays;
+Set E1286.CheckNewAD;
+If Deal_Id='533747MM' then Announcement_date=Announcement_date+1;
+If Deal_Id='536482MM' then Announcement_date=Announcement_date+1;
+If Deal_Id='566017MM' then Announcement_date=Announcement_date+1;
+If Deal_Id='576627MM' then Announcement_date=Announcement_date+1;
+If Deal_Id='587876MM' then Announcement_date=Announcement_date+1;
+If Deal_Id='731631MM' then Announcement_date=Announcement_date+1;
+If Deal_Id='737169MM' then Announcement_date=Announcement_date+1;
+If Deal_Id='779650MM' then Announcement_date=Announcement_date+1;
+If Deal_Id='737066MM' then Announcement_date=Announcement_date+2;
+If Deal_Id='828782MM' then Announcement_date=Announcement_date+3;
+If Deal_Id='864949MM' then Announcement_date=Announcement_date+3;
+Else Announcement_date=Announcement_date;
+Run;
+
+Data E1286.Prices_ADFin;
+Set E1286.ChangeHolidays;
+Drop Type_AD New_AD;
+Run;
+
+/*Calculating returns*/
+
+Data E1286.Returns;
+set E1286.prices_ADFin;
+LDeal_Id= lag (deal_id);
+Lprice= Lag (price);
+LMarket_Price = Lag (Market_price);
+if deal_id ne Ldeal_Id then Lprice=.;
+If deal_id ne Ldeal_Id then LMarket_Price=.;
+Ret= price/Lprice-1;
+Mret=Market_Price/LMarket_price-1;
+run;
+
+Data E1286.Price_Returns;
+set E1286.Returns;
+drop Market_price Ldeal_Id LPrice LMarket_price;
+run;
+
+Proc sort data= E1286.Price_returns;
+by deal_id descending date;
+run;
+
+Data E1286.Returns_TempRow;
+set E1286.Price_returns;
+by deal_id descending date;
+if first.deal_id and first.date then rowid=0;
+rowid+1;
+run;
+
+/*Listing event date as Day 0 and accordingly assigning day number labels for each deal_id*/
+
+Data E1286.Event_Day;
+Set E1286.Returns_TempRow;
+if announcement_date=date;
+RowDay= rowid;
+Keep Deal_id RowDay;
+run;
+proc sort data= E1286.Event_Day;
+by deal_id;
+run;
+Proc sort data=E1286.Returns_Temprow;
+by deal_id;
+run;
+Data E1286.Ret_DayId;
+merge E1286.Returns_Temprow(in=a) E1286.Event_day (in=b);
+by deal_id;
+if a=1 & b=1;
+run;
+
+Data E1286.Ret_DayNum;
+set E1286.ret_DayId;
+Daynum=rowday-rowid;
+run;
+
+Data E1286.RegressionM;
+set E1286.Ret_Daynum;
+if Daynum<-40 & DayNum>=-290;
+by deal_id;
+Run;
+
+proc reg data= E1286.RegressionM outest=E1286.Regression_Result;
+by deal_id;
+model ret=mret;
+quit;
+
+/* Merging Regression values with dataset and calculation of Abnormal Returns with regression values*/
+
+Data E1286.RegressReT;
+merge E1286.Ret_Daynum (in=a) E1286.Regression_Result (in=b);
+by deal_id;
+if a=1 & b=1;
+Keep Deal_Id Date Ret Mret DayNum _RMSE_ Intercept;
+run;
+
+Proc Sql;
+Create Table E1286.AbReturns as
+Select distinct(deal_id),Date, Ret, Mret, Daynum, Ret-(Intercept+_RMSE_*Mret) as AbReturns
+from E1286.RegressRet group by Deal_Id;
+quit;
+
+/*Calculation of Cummulative Abnormal Returns for period -1 to 1-CAR3*/
+
+Proc Sql;
+Create Table E1286.Car3 as 
+Select distinct (Deal_Id),Sum(Abreturns) as CAR3
+from E1286.Abreturns
+Where Daynum between -1 and 1
+group by deal_id;
+quit;
+/*Calculation of Cummulative Abnormal Returns for period -2 to 2-CAR5*/
+Proc Sql;
+Create Table E1286.Car5 as
+Select distinct (Deal_Id),Sum(Abreturns) as CAR5
+from E1286.ABReturns
+Where Daynum between -2 and 2
+group by deal_id;
+quit;
+
+Data E1286.Car3_5;
+merge E1286.Car3(in=a) E1286.Car5(in=b);
+by deal_id;
+if a=1 & b=1;
+run;
+
+Data E1286.Percent_Car3_5;
+Set E1286.Car3_5;
+Car3_Percent=Car3*100;
+Car5_Percent=Car5*100;
+Run;
+
+Data E1286.Deals_CAR35;
+Merge E1286.Deals_Dateset (in=a) E1286.Percent_Car3_5 (in=b);
+by Deal_id;
+if a=1 & b=1;
+run;
+
+Proc Univariate data=E1286.Deals_Car35;
+Var Car3_percent Car5_Percent;
+Run;
+
+Proc Univariate data=E1286.Deals_Car35;
+Var Car3_percent Car5_Percent;
+Where Acq_Public=1;
+Run;
+
+Proc Univariate data=E1286.Deals_Car35;
+Var Car3_percent Car5_Percent;
+Where Acq_Public=0;
+Run;
+
+/*Similarly, for separating public and private acquirers from the whole data, we can merge the data with deals data set having public acquisition column 0/1, and identify summary statistics by mentioning where condition for that column-similarly for all the variables*/
+
+/*Public Acquirer classification Dataset-1286*/
+
+Data E1286.Deals_PublicAcquirer;
+Set E1286.Deals_Dateset;
+if Acq_Public=1 then Public_Acquirer='Public';
+if Acq_Public=0 then Public_Acquirer='Private';
+run;
+
+/*Completed Deal Dataset-1286 and Summary Statistics*/
+
+Data E1286.Deals_CompletedDeal;
+Set E1286.Deals_PublicAcquirer;
+if Completion_date ne '' then Completed_deal=1;
+if Withdrawn_date ne '' then Completed_deal=0;
+run;
+
+Proc Univariate data=E1286.Deals_CompletedDeal;
+Var Completed_deal;
+Run;
+
+Proc Univariate data=E1286.Deals_CompletedDeal;
+Var Completed_deal;
+Where acq_public=1;
+Run;
+
+Proc Univariate data=E1286.Deals_CompletedDeal;
+Var Completed_deal;
+Where acq_public=0;
+Run;
+
+/*Friendly Deal Dataset-1286 and Summary Statistics*/
+
+Data E1286.Deals_FriendlyDeal;
+Set E1286.Deals_CompletedDeal;
+if Attitude='Friendly' then Friendly_deal=1;
+else Friendly_deal=0;
+run;
+
+Proc Univariate data=E1286.Deals_FriendlyDeal;
+Var Friendly_deal;
+Run;
+
+Proc Univariate data=E1286.Deals_FriendlyDeal;
+Var Friendly_deal;
+Where Acq_Public=1;
+Run;
+
+Proc Univariate data=E1286.Deals_FriendlyDeal;
+Var Friendly_deal;
+Where Acq_Public=0;
+Run;
+
+/*Stock_Volatality-Calculation*/
+
+Proc Sql; create table E1286.Deals_volatility as
+select distinct deal_Id, std(ret) as Volatility
+from E1286.Ret_Daynum 
+Where Daynum<-40 & DayNum>=-290
+group by deal_id;
+quit;
+Data E1286.Deals_VolatilityPercent;
+Set E1286.Deals_volatility;
+Volatility_Percent= Volatility*100;
+Run;
+Data E1286.OP1;
+Set E1286.Ret_Daynum;
+M42=Rowday-42;
+Where Daynum=0;
+Run;
+Data E1286.P42;
+Set E1286.OP1;
+Price_42=Price;
+run;
+Data E1286.P_42;
+Set E1286.Ret_Daynum;
+where Daynum=-42;
+Price_m42=Price;
+run;
+
+/*Merge with deals_dataset(using friendly deal dataset to add this variable to data) by deal id on stock price
+and then calculate offer premium and summary statistics*/
+
+Data E1286.Deals_Price42;
+merge E1286.Deals_Friendlydeal(in=a) E1286.P_42(in=b);
+by deal_id;
+if a=1 & b=1;
+run;
+Data E1286.Deals_OfferPremium1;
+Set E1286.Deals_Price42;
+If Price_per_share = ' ' then price_per_share=0;
+Run;
+Data E1286.Deals_OfferPremium;
+Set E1286.Deals_OfferPremium1;
+Offer_Premium=(Price_per_share-Price_m42)/Price_m42;
+Percent_OfferPremium=Offer_premium*100;
+Run;
+Proc Univariate data=E1286.Deals_OfferPremium;
+Var Percent_OfferPremium;
+run;
+Proc Univariate data=E1286.Deals_OfferPremium;
+Var Percent_OfferPremium;
+Where Acq_Public=1;
+run;
+Proc Univariate data=E1286.Deals_OfferPremium;
+Var Percent_OfferPremium;
+Where Acq_Public=0;
+run;
+/*Run_Up% calculation and summary statistics*/
+
+Data E1286.RRDaynum1;
+Set E1286.Ret_DayNum;
+if Daynum <-40 and Daynum >= -290;
+run;
+
+Proc reg data=E1286.RRDAYNUM1 outest=E1286.Runup_Reg noprint;
+by deal_id;
+model ret=mret;
+quit;
+
+Data E1286.MarketModel;
+Set E1286.Runup_reg;
+Slope=mret;
+Keep Deal_Id intercept slope;
+run;
+
+Data e1286.Runup_1040;
+Set E1286.ret_daynum;
+if Daynum>=-40 and Daynum<=-10;
+run;
+
+Proc sort data= E1286.Runup_1040;
+by deal_id;
+run;
+
+Proc Sort data=E1286.MarketModel;
+by deal_id;
+run;
+
+Data E1286.Ret_Runup1;
+merge E1286.Runup_1040 (in=a) E1286.Marketmodel(in=b);
+by deal_id;
+if a=b=1;
+run;
+
+Data E1286.Ret_Runup;
+Set E1286.Ret_Runup1;
+Pred_Return=Intercept+slope*mret;
+AR=Ret-Pred_return;
+Run;
+
+Proc sort data=E1286.Ret_Runup;
+by deal_id;
+run;
+
+Proc sql;
+Create Table E1286.Runup_CARF as Select distinct(deal_id), sum(AR) as CAR_Runup
+from E1286.Ret_Runup
+group by deal_id;
+run;
+
+Data E1286.Runup_Percent;
+Set E1286.Runup_CARF;
+Runup_Percent=CAR_Runup*100;
+Run;
+Data E1286.Deals_RunUp;
+merge E1286.Deals_OfferPremium(in=a) E1286.Runup_Percent(in=b);
+by deal_id;
+if a=1 & b=1;
+run;
+
+Proc Univariate data=E1286.Deals_Runup;
+Var CAR_Runup Runup_percent;
+run;
+
+Proc Univariate data=E1286.Deals_Runup;
+Var CAR_Runup Runup_percent;
+Where Acq_public=1;
+run;
+
+Proc Univariate data=E1286.Deals_Runup;
+Var CAR_Runup Runup_percent;
+Where Acq_public=0;
+run;
+
+/*Resolution period and summary statistics calculation*/
+
+Data E1286.Deals_ResolutionPeriod1;
+Set E1286.Deals_Dateset;
+if Completion_date ne '' then Resolution_Period=(Completion_Date-Announcement_date);
+if Withdrawn_date ne '' then Resolution_Period=(Withdrawn_date-Announcement_date);
+run;
+
+Proc Univariate data=E1286.Deals_ResolutionPeriod1;
+Var Resolution_Period;
+Run;
+
+Proc Univariate data=E1286.Deals_ResolutionPeriod1;
+Var Resolution_Period;
+Where acq_public=1;
+Run;
+
+Proc Univariate data=E1286.Deals_ResolutionPeriod1;
+Var Resolution_Period;
+Where acq_public=0;
+Run;
+
+Data E1286.Deals_ResolutionPeriod;
+merge E1286.Deals_Runup(in=a) E1286.Deals_ResolutionPeriod1(in=b);
+by deal_id;
+if a=1 & b=1;
+run;
+
+Data E1286.Deals_AddedVar;
+Merge E1286.Deals_ResolutionPeriod (in=a) E1286.Deals_Volatilitypercent (in=b);
+If a=b=1;
+run;
+
+/*Summary Statistics for Stock Volatality*/
+
+Proc Univariate data=E1286.Deals_AddedVar;
+Var Volatility_Percent;
+Run;
+
+Proc Univariate data=E1286.Deals_AddedVar;
+Var Volatility_Percent;
+Where acq_Public=1;
+Run;
+
+Proc Univariate data=E1286.Deals_AddedVar;
+Var Volatility_Percent;
+Where acq_Public=0;
+Run;
+
+/*Estimating Summary statistics for remaining variables*/
+
+Proc Univariate data=E1286.Deals_Dateset;
+Var assets sales_growth totaldebt_assets oibdp_assets HHI mktvalue_equity;
+Run;
+
+Proc Univariate data=E1286.Deals_Dateset;
+Var assets sales_growth totaldebt_assets oibdp_assets HHI mktvalue_equity;
+Where Acq_Public=1;
+Run;
+
+Proc Univariate data=E1286.Deals_Dateset;
+Var assets sales_growth totaldebt_assets oibdp_assets HHI mktvalue_equity;
+Where Acq_Public=0;
+Run;
+
+
+Proc Univariate data=E1286.Deals_AddedVar;
+Var transaction_value tobinsq Tender_Offer Auction sameindustry_twodig
+sameindustry_threedig sameindustry_fourdig institutional_ownership
+cash_payment allcash price_revision;
+Run;
+
+Proc Univariate data=E1286.Deals_AddedVar;
+Var transaction_value tobinsq Tender_Offer Auction sameindustry_twodig
+sameindustry_threedig sameindustry_fourdig institutional_ownership
+cash_payment allcash price_revision;
+where acq_public=1;
+Run;
+
+Proc Univariate data=E1286.Deals_AddedVar;
+Var transaction_value tobinsq Tender_Offer Auction sameindustry_twodig
+sameindustry_threedig sameindustry_fourdig institutional_ownership
+cash_payment allcash price_revision;
+Where acq_public=0;
+Run;
+/* Offer Premium and CAR regressions */
+
+Data E1286.Regression_Deals;
+Set E1286.Deals_ResolutionPeriod;
+Drop NewAD rowid rowday;
+Run;
+
+/*Offer premium: lnat sales_growth totaldebt_assets oibdp_assets hhi tobinsq*/
+
+Data E1286.RegressionMain_Deals;
+Set E1286.Regression_Deals;
+Lnat=Log(assets);
+run;
+
+proc reg data= E1286.RegressionMain_deals;
+model Offer_Premium=Lnat Sales_growth totaldebt_assets oibdp_assets hhi tobinsq;
+quit;
+
+/* Offer premium: lnat sales_growth totaldebt_assets oibdp_assets hhi tobinsq acq_public 
+Tender_Offer Auction sameindustry_threedig institutional_ownership friendly_deal allcash*/
+
+proc reg data= E1286.RegressionMain_deals;
+model Offer_Premium=Lnat Sales_growth totaldebt_assets oibdp_assets hhi tobinsq
+acq_public Tender_Offer Auction sameindustry_threedig institutional_ownership friendly_deal allcash;
+quit;
+
+/*CAR3:lnat sales_growth totaldebt_assets oibdp_assets hhi tobinsq acq_public Tender_Offer Auction 
+sameindustry_threedig institutional_ownership friendly_deal allcash runup*/
+
+Data E1286.Regression_CAR3;
+Merge E1286.RegressionMain_deals (in=a) E1286.Percent_Car3_5 (in=b);
+by Deal_id;
+If a=b=1;
+run;
+
+proc reg data= E1286.Regression_CAR3;
+model CAR3=lnat sales_growth totaldebt_assets oibdp_assets hhi tobinsq acq_public Tender_Offer Auction 
+sameindustry_threedig institutional_ownership friendly_deal allcash CAR_Runup;
+quit;
+
+/*Completed Deal: lnat sales_growth totaldebt_assets oibdp_assets hhi tobinsq acq_public Tender_Offer 
+Auction sameindustry_threedig institutional_ownership friendly_deal allcash runup car3*/
+
+proc reg data= E1286.Regression_CAR3;
+model Completed_Deal=lnat sales_growth totaldebt_assets oibdp_assets hhi tobinsq acq_public Tender_Offer 
+Auction sameindustry_threedig institutional_ownership friendly_deal allcash CAR_Runup CAR3;
+quit;
+
+/*Create a Final dataset with calculated and given variables*/
+
+Data E1286.AddingCAR;
+merge E1286.Regressionmain_deals (in=a) E1286.Percent_Car3_5 (in=b);
+by deal_id;
+if a=b=1;
+run;
+
+Data E1286.AddingVolatility;
+Merge E1286.AddingCAR (in=a) E1286.Deals_VolatilityPercent (in=b);
+by deal_id;
+if a=b=1;
+run;
+
+Data E1286.Exam1_FinalDataset;
+Set E1286.AddingVolatility;
+Keep PermNo Deal_Id Announcement_Date Transaction_status Withdrawn_date
+Completion_date strategic_buyer Attitude Tender_offer Auction pct_cash
+pct_stock price_per_share price_per_share_change acq_public GVKEY Fyear
+Assets Sic_Fourdig Sales_growth totaldebt_assets oibdp_assets hhi mktvalue_equity
+transaction_value tobinsq sameindustry_twodig sameindustry_threedig sameindustry_fourdig
+institutional_ownership cash_payment allcash price_Revision Public_Acquirer Completed_deal
+Friendly_deal Price_m42 Percent_Offerpremium CAR_RunUp
+runup_Percent CAR3_Percent CAR5_Percent Resolution_period Volatility
+Volatility_percent Lnat;
+run;
+
