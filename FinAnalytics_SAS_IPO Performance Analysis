@@ -1,0 +1,191 @@
+Libname We6 base "C:\Bhavya\Spring23\FIN ANALYTICS\Module 2\Week6 Rev\Libraries";
+
+Proc Sort data= we6.prices_data;
+by permno date;
+run;
+
+Data We6.Returns;
+set we6.prices_data;
+LagPermno= lag(permno);
+Lagprice= lag(price);
+if permno ne lagpermno then lagprice=.;
+Returns= price/lagprice-1;
+drop lagpermno lagprice price;
+run;
+
+
+*/Data We6.returns;
+set we6.prices_data;
+LagPermno= lag(permno);
+Lagprice= lag(price);
+if permno ne lagpermno then lagprice=.;
+HPReturns= (Price*lagprice)-1;
+drop lagpermno lagprice price;
+run;
+
+Data We6.returns1;
+Set we6.returns;
+by permno date;
+if first.permno and first.date then trading_day=0;
+trading_day+1;
+oneplus_Returns=1+Returns;
+oneplus_vw=1+vwretd;
+oneplus_ew=1+ewretd;
+oneplus_sp=1+sprtrn;
+drop vwretd ewretd sprtrn;
+run;
+
+Data we6.Returns2;
+set we6.Returns1;
+if trading_day >= 2 & trading_day<=22 then month=1;
+if trading_day >= 23 & trading_day<=43 then month=2;
+if trading_day >= 44 & trading_day<=64 then month=3;
+if trading_day >= 65 & trading_day<=85 then month=4;
+if trading_day >= 86 & trading_day<=106 then month=5;
+if trading_day >= 107 & trading_day<=127 then month=6;
+if trading_day >= 128 & trading_day<=148 then month=7;
+if trading_day >= 149 & trading_day<=169 then month=8;
+if trading_day >= 170 & trading_day<=190 then month=9;
+if trading_day >= 191 & trading_day<=211 then month=10;
+if trading_day >= 212 & trading_day<=232 then month=11;
+if trading_day >= 233 & trading_day<=253 then month=12;
+if trading_day >= 254 & trading_day<=274 then month=13;
+if trading_day >= 275 & trading_day<=295 then month=14;
+if trading_day >= 296 & trading_day<=316 then month=15;
+if trading_day >= 317 & trading_day<=337 then month=16;
+if trading_day >= 338 & trading_day<=358 then month=17;
+if trading_day >= 359 & trading_day<=379 then month=18;
+if trading_day >= 380 & trading_day<=400 then month=19;
+if trading_day >= 401 & trading_day<=421 then month=20;
+if trading_day >= 422 & trading_day<=442 then month=21;
+if trading_day >= 443 & trading_day<=463 then month=22;
+if trading_day >= 464 & trading_day<=484 then month=23;
+if trading_day >= 485 & trading_day<=505 then month=24;
+if trading_day >= 506 & trading_day<=526 then month=25;
+if trading_day >= 527 & trading_day<=547 then month=26;
+if trading_day >= 548 & trading_day<=568 then month=27;
+if trading_day >= 569 & trading_day<=589 then month=28;
+if trading_day >= 590 & trading_day<=610 then month=29;
+if trading_day >= 611 & trading_day<=631 then month=30;
+if trading_day >= 632 & trading_day<=652 then month=31;
+if trading_day >= 653 & trading_day<=673 then month=32;
+if trading_day >= 674 & trading_day<=694 then month=33;
+if trading_day >= 695 & trading_day<=715 then month=34;
+if trading_day >= 716 & trading_day<=736 then month=35;
+if trading_day >= 737 & trading_day<=757 then month=36;
+if month=. then delete;
+run;
+
+Proc Sort data=we6.returns2;
+by permno month date;
+run;
+
+Data we6.returns3;
+set we6.returns2;
+by permno month date;
+if first.month=1 then delete;
+run;
+
+proc sort data we6.returns3; 
+by permno month date;
+run;
+
+Data we6.returns4;
+set we6.returns3;
+by permno month date;
+retain prev_return prev_vw prev_ew prev_sp;
+if first.month=1
+then do;
+ReturnBM=oneplus_returns;
+prev_return=ReturnBM;
+vw=oneplus_vw;
+prev_vw=vw;
+ew=oneplus_ew;
+prev_ew=ew;
+sp=oneplus_sp;
+prev_sp=sp;
+end;
+else do;
+ReturnBM=prev_return*oneplus_returns;
+prev_return=ReturnBM;
+vw=prev_vw*oneplus_vw;
+prev_vw=vw;
+ew=prev_ew*oneplus_ew;
+prev_ew=ew;
+sp=prev_sp*oneplus_sp;
+prev_sp=sp;
+end;
+Monthly_Return=ReturnBM-1;
+Monthly_vw=vw-1;
+Monthly_ew=ew-1;
+monthly_sp=sp-1;
+run;
+
+Data we6.Retcheck1;
+set we6.returns4;
+keep permno month date oneplus_returns prev_return returns;
+run;
+
+Data we6.returns5;
+set we6.returns4;
+by permno month date;
+if last.month=1;
+keep permno month Monthly_return monthly_vw monthly_ew monthly_sp mktvalue_equity;
+run;
+
+Data we6.returns6;
+set we6.returns5;
+vw_adj_ret=monthly_return-monthly_vw;
+ew_adj_ret=monthly_return-monthly_ew;
+sp_adj_ret=monthly_return-monthly_sp;
+run;
+
+Proc SQL; create table we6.MonthlyReturnsF as select distinct month, count(permno) as no_of_firms, avg(Monthly_return) as raw_returns,
+avg(vw_adj_ret) as vw_adj_ret,
+avg(ew_adj_ret) as ew_adj_ret,
+avg(sp_adj_ret) as sp_adj_ret
+from we6.returns6
+group by month;
+quit;
+
+Proc SQL; create table we6.MedianMRF as select distinct month, count(permno) as no_of_firms, Median (Monthly_return) as raw_returns_Med,
+Median(vw_adj_ret) as vw_adj_ret_Med,
+Median(ew_adj_ret) as ew_adj_ret_Med,
+Median(sp_adj_ret) as sp_adj_ret_Med
+from we6.returns6
+group by month;
+quit;
+
+Data we6.HP_AdjRetF;
+set we6.Returns4;
+vw_adj_retHP=ReturnBM-vw;
+ew_adj_retHP=ReturnBM-ew;
+sp_adj_retHP=ReturnBM-sp;
+run;
+
+Proc SQL; create table we6.HoldPRetAvg as select distinct month, count(permno) as no_of_firms, Avg(ReturnBM) as HPAvg_Raw_returns,
+avg(vw_adj_retHP) as Avg_vw_HP,
+avg(ew_adj_retHP) as Avg_ew_HP,
+avg(sp_adj_retHP) as Avg_sp_HP
+from we6.HP_AdjRetF
+group by month;
+quit;
+
+Proc SQL; create table we6.HoldPRetM as select distinct month, count(permno) as no_of_firms, Median(ReturnBM) as Raw_returnsMed,
+Median(vw_adj_retHP) as Med_vw_HP,
+Median(ew_adj_retHP) as Med_ew_HP,
+Median(sp_adj_retHP) as Med_sp_HP
+from we6.HP_AdjRetF
+group by month;
+quit;
+
+Proc Univariate data=we6.hp_AdjretF;
+Var ReturnBM;
+run;
+
+proc print data=we6.hp_returns;
+run;
+
+
+Retutnshp
+HPAdjustedc
