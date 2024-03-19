@@ -1,0 +1,109 @@
+Libname Assi5 Base "C:\Bhavya\Spring23\FIN ANALYTICS\Module 2";
+
+/*Cleaning up data for analysis*/
+
+Proc sort data=Assi5.Prices;
+by deal_id date;
+run;
+
+Proc means data=Assi5.prices;
+var price market_price;
+quit;
+
+Data Aprices;
+set assi5.prices;
+absprice= abs (price);
+drop price;
+run;
+
+
+/* Creating values manually using lag function*/
+
+Data Assi5.Returns;
+set Aprices;
+LDeal_Id= lag (deal_id);
+Lprice= Lag (absprice);
+LMarket_Price = Lag (Market_price);
+if deal_id ne Ldeal_Id then Lprice=.;
+If deal_id ne Ldeal_Id then LMarket_Price=.;
+Ret= absprice/Lprice-1;
+Mret=Market_Price/LMarket_price-1;
+run;
+
+Data Returns_1;
+set assi5.Returns;
+drop Absprice Market_price Ldeal_Id LPrice LMarket_price;
+run;
+
+/* Arriving at the market model*/
+
+Proc sort data= assi5.returns_1;
+by deal_id descending date;
+run;
+
+Data ASSI5.Ret_Temp;
+set assi5.returns_1;
+by deal_id descending date;
+if first.deal_id and first.date then rowid=0;
+rowid+1;
+run;
+
+/*Listing event date as Day 0 and accordingly assigning day number labels for each deal_id*/
+
+Data Assi5.Event_Dates;
+Set assi5.ret_temp;
+if announcement_date=date;
+RowDay= rowid;
+Keep Deal_id RowDay;
+run;
+
+proc sort data= Assi5.Event_dates;
+by deal_id;
+run;
+
+Proc sort data=Assi5.Ret_Temp;
+by deal_id;
+run;
+
+Data Assi5.Ret_DayId;
+merge Assi5.ret_temp(in=a) Assi5.Event_dates(in=b);
+by deal_id;
+if a=1 & b=1;
+run;
+
+Data Assi5.Ret_DayNum;
+set Assi5.ret_DayId;
+Daynum=rowday-rowid;
+run;
+
+/* Estimating the regression for 250 day period */
+
+Data Assi5.MReg;
+set Assi5.Ret_Daynum;
+if Daynum<-40 & DayNum>=-290;
+by deal_id;
+Run;
+
+proc reg data= assi5.MReg outest=assi5.Regression;
+by deal_id;
+model ret=mret;
+quit;
+
+/* Merging Regression values with dataset*/
+
+Data Assi5.RegressRet;
+merge Assi5.Ret_Daynum (in=a) assi5.Regression (in=b);
+by deal_id;
+if a=1 & b=1;
+Keep Deal_Id Announcement_date Date Ret Mret DayNum _RMSE_ Intercept;
+run;
+
+/* Estimating Abnormal Returns by deal_id */
+Proc Sql;
+Create Table Assi5.AbReturns as
+Select distinct(deal_id), Announcement_date, Date, Ret, Mret, Daynum, Ret-(Intercept+_RMSE_*Mret) as AbReturns
+from Assi5.Regressret group by deal_id;
+quit;
+Proc print data=Ex1.Deals_date;
+Where sic_fourdig between '0111' and '0971';
+Run;
