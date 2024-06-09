@@ -7,7 +7,7 @@ DESCRIPTION: The project aimed to assist IBM in addressing employee attrition is
 
 **2) PROJECT TITLE:  CONSUMER BEHAVIOR PREDICTION AND LOYALTY ANALYTICS THROUGH SEGMENTATION- ONLINE RETAIL**
 DATA FEATURES: Transactional Data of 25,000 customers with over 500,000 transactions of an online retail platform.
-**TOOLS &TECHNIQUES:** KMeans clustering for customer segmentation, word cloud generation, and Principal Component Analysis (PCA) for transforming product category information. Employed machine learning techniques including KNN, Decision Trees, Gradient Boosting, Random Forest, and SVM for training predictive models.
+**TOOLS &TECHNIQUES:** **KMeans clustering for customer segmentation, word cloud generation, and Principal Component Analysis (PCA) for transforming product category information. Employed machine learning techniques including KNN, Decision Trees, Gradient Boosting, Random Forest, and SVM for training predictive models.**
 DESCRIPTION: This project addresses the challenges of customer relationship management (CRM) by analyzing transactional data, segmenting customers based on RFM (Recency, Frequency, Monetary) model, and predicting future purchasing behavior. By leveraging machine learning techniques, it aims to develop a customer-centric strategy, enhancing customer loyalty and brand image through targeted marketing campaigns and personalized recommendations.
 
 **3) PROJECT TITLE: WHO HEALTHCARE ANALYTICS: LEVERAGING MACHINE LEARNING TO UNRAVEL GLOBAL LIFE EXPECTANCY FACTORS**
