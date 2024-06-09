@@ -1,4 +1,5 @@
 **PROJECT DESCRIPTION AND INDEX**
+
 **PROJECT TITLE: ENABLING THE SMART WORKFORCE MANAGEMENT THROUGH ANALYTICS**
 DATA FEATURES: Employee data set with characteristics of job and employment.
 **TOOLS &TECHNIQUES: IBM SPSS, Tableau Dashboard, Exploratory Data Analysis, Decision Tree, Logistic Regression.**
